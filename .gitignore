@@ -39,3 +39,4 @@
 .project
 .pydevproject
 private/*
+.idea

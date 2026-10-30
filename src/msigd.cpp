@@ -70,6 +70,7 @@ enum series_t
 	MAG251RX       = 0x00080000,
 	MAG274QRX      = 0x00100000, // enable in master once feedback received
 	MD272QP        = 0x00200000, // enable in master once feedback received
+	MPG322URX      = 0x00400000, // experimental, only FreeSync writes enabled
 	QUERYONLY      = 0x01000000,
 	UNKNOWN        = 0x02000000,
 
@@ -118,10 +119,15 @@ struct identity_t
 	bool		ro = false;
 };
 
+// Captured identity; Adaptive Sync reads and writes confirmed on hardware.
+static const identity_t mpg322urx_v20 =
+	{ MPG322URX, "00\xae", "V20", "MPG 322URX QD-OLED (experimental, FreeSync writes only)", LT_NONE, true };
+
 static std::vector<identity_t> known_models =
 {
 	{ UNKNOWN,           "",     "", "Unknown", LT_NONE },
 	{ QUERYONLY,         "",     "", "Unknown Series", LT_NONE },
+	mpg322urx_v20,
 	{ MAG321CURV,        "00;", "V18", "MAG321CURV", LT_MYSTIC },                  // MAG321CURV - FW.009
 	{ MAG321CURV,        "00;", "V43", "MAG321CURV", LT_MYSTIC },                  // MAG321CURV - FW.011 - supports serial - issue #32
 	{ MAG321CQR,         "00:", "V18", "MAG321CQR", LT_MYSTIC },                   // doesn't have USBC
@@ -586,7 +592,7 @@ static std::vector<setting_t *> settings(
 
 	new setting_t(MAG321CURV, WRITE,       "00100", "power", {"off", "-on"}),
 
-	new setting_t(ALL, READ,               "00110", "macro_key", {"off", "pressed"}),  // returns 000 called frequently by OSD app, readonly
+	new setting_t(ALL | MPG322URX, READ,               "00110", "macro_key", {"off", "pressed"}),  // returns 000 called frequently by OSD app, readonly
 	(new setting_t(MAG272GRP,               "00120", "mode", {"user", "fps", "racing", "rts", "rpg", "mode5", "mode6", "mode7", "mode8", "mode9", "user", "reader", "cinema", "designer", "HDR"}))->set_access(READ),
 	new setting_t(MAG274QRFQD,             "00120", "mode", {"user", "fps", "racing", "rts", "rpg", "mode5", "mode6", "mode7", "mode8", "mode9", "user", "reader", "cinema", "office"}), //Supported modes in FW.011
 	new setting_t(MAG274QRFQD16,
@@ -600,8 +606,8 @@ static std::vector<setting_t *> settings(
 
 	new setting_t(PS341WU,                 "00120", "mode", {"-m0","-m1","-m2","-m3","-m4""-m5","-m6","-m7","-m8","-m9",
 		"user", "adobe_rgb", "dci_p3", "srgb", "hdr", "cinema", "reader", "bw", "dicom", "eyecare", "cal1", "cal2", "cal3"}),
-	new setting_t(ALL,                     "00130", "serial"), // returns 13 blanks
-	new setting_t(ALL,                     "00170", "frequency"),   // returns 060
+	new setting_t(ALL | MPG322URX,                     "00130", "serial"), // returns 13 blanks
+	new setting_t(ALL | MPG322URX,                     "00170", "frequency"),   // returns 060
 	new setting_t(PS341WU, READ,           "00180", "quick_charge", {"off", "on"}),  // returns 56006 on MAG, 000 on PS341WU
 
 	new setting_t(MAG321CURV | MAG321CQR | MAG272GRP | MAG271CQR | MAG241GRP | MAG274QRFQD | MAG274QRFQD16 | MAG274R | MPG | MAG321QR | MAG251RX | MAG274QRX,
@@ -658,8 +664,12 @@ static std::vector<setting_t *> settings(
 	// Seems to exist on all monitors MAG251RX
 	new setting_t(UNKNOWN /*MAG321CURV*/,  "00280", "unknown280"),  // returns 000, read only, write fails and monitor needs off/on cycle
 
+	// Raw read-only alias; queried only when explicitly selected with -f.
+	new setting_t(MPG322URX, "00280", "adaptive_sync_probe"),
+
+	// MPG322URX V20: on -> 001, off -> 000; reads and writes tested on hardware.
 	// FIXME: free_sync also on MPG27CQ
-	new setting_t(MAG321CQR | MAG272GRP | MAG271CQR | MAG241GRP | MAG274GRP | MPG341CQR | MPG273CQR | MPG27CQ | MAG321QR | MD272QP,
+	new setting_t(MAG321CQR | MAG272GRP | MAG271CQR | MAG241GRP | MAG274GRP | MPG341CQR | MPG273CQR | MPG27CQ | MAG321QR | MD272QP | MPG322URX,
 		                                   "00280", "free_sync", {"off", "on"}),
 	new setting_t(MAG321CURV | MAG321CQR | MAG271CQR | MPG341CQR | MPG27CQ,
 		                                   "00290", "zero_latency", {"off", "on"}),  // returns 001
@@ -675,7 +685,7 @@ static std::vector<setting_t *> settings(
 										   "002;0", "night_vision", {"off", "normal", "strong", "strongest", "ai"}),
 	new setting_t(MAG272GRP | MAG251RX,    "00300", "pro_mode", {"user", "reader", "cinema", "designer", "HDR"}),
 	new setting_t(MAG274QRFQD,             "00300", "pro_mode", {"user", "reader", "cinema", "office"}),
-	new setting_t(MAG274QRFQD16 | MAG274QRFQD20,          
+	new setting_t(MAG274QRFQD16 | MAG274QRFQD20,
 	                                       "00300", "pro_mode", {"user", "reader", "cinema", "office", "srgb", "adobe_rgb", "dci_p3"}),
 	new setting_t(MAG321CURV | MAG321CQR | MAG271CQR | MAG241GRP | MPG341CQR | MPG27CQ | MAG274R,
 		                                   "00300", "pro_mode", {"user", "reader", "cinema", "designer"}),
@@ -684,12 +694,12 @@ static std::vector<setting_t *> settings(
 	new setting_t(MAG274QRX,               "00300", "pro_mode", {"user", "anti_blue", "movie", "office", "srgb", "adobe_rgb", "dci_p3", "eco"}),
 	new setting_t(MD272QP,                 "00300", "pro_mode", {"eco", "user", "srgb", "anti_blue", "movie", "office", "black_white"}),
 	// low blue light on MPG273, MAG274QRX
-	new setting_t(ALL,                     "00310", "eye_saver", {"off", "on"}),  // returns 000
-	new setting_t(ALL,                     "00340", "image_enhancement", {"off","weak","medium","strong","strongest"}),
+	new setting_t(ALL | MPG322URX,                     "00310", "eye_saver", {"off", "on"}),  // returns 000
+	new setting_t(ALL | MPG322URX,                     "00340", "image_enhancement", {"off","weak","medium","strong","strongest"}),
 
-	new setting_t(ALL,                     "00400", "brightness", 0, 100),  // returns 048
-	new setting_t(ALL,                     "00410", "contrast", 0, 100),  // returns 050
-	new setting_t(ALL,                     "00420", "sharpness", 0, 5),  // returns 000
+	new setting_t(ALL | MPG322URX,                     "00400", "brightness", 0, 100),  // returns 048
+	new setting_t(ALL | MPG322URX,                     "00410", "contrast", 0, 100),  // returns 050
+	new setting_t(ALL | MPG322URX,                     "00420", "sharpness", 0, 5),  // returns 000
 	new setting_t(MAG | MPG | MAG321QR | MAG251RX | MAG274QRX | MD272QP,
 		                                   "00430", "color_preset", {"cool", "normal", "warm", "custom"}),
 	new setting_t(PS341WU,                 "00430", "color_preset", {"5000K", "5500K", "6500K", "7500K", "9300K", "10000K", "custom"}),
@@ -699,7 +709,7 @@ static std::vector<setting_t *> settings(
 		                                   "00432", "color_green", 0, 100),
 	new setting_t(MAG | MPG | MAG321QR | MAG251RX | MAG274QRX | MD272QP,
 		                                   "00433", "color_blue", 0, 100),
-	new tripple_t(ALL,                     "00434", "color_rgb"),  // returns bbb  -> value = 'b' - '0' = 98-48=50
+	new tripple_t(ALL | MPG322URX,                     "00434", "color_rgb"),  // returns bbb  -> value = 'b' - '0' = 98-48=50
 
 	new setting_t(PS341WU,                 "00460", "gray_level", 0, 20),
 	new setting_t(PS341WU,                 "00480", "low_blue_light", {"off", "on"}),
@@ -755,8 +765,8 @@ static std::vector<setting_t *> settings(
 	(new setting_t(MAG | MAG251RX | MAG274QRX | MD272QP,
 		                                   "00800", "osd_language", 0, 19, -100))->set_access(READ),
 	(new setting_t(PS341WU,                "00800", "osd_language", 0, 28, -100))->set_access(READ),
-	new setting_t(ALL,                     "00810", "osd_transparency", 0, 5),  // returns 000
-	new setting_t(ALL,                     "00820", "osd_timeout",0, 30),  // returns 020
+	new setting_t(ALL | MPG322URX,                     "00810", "osd_transparency", 0, 5),  // returns 000
+	new setting_t(ALL | MPG322URX,                     "00820", "osd_timeout",0, 30),  // returns 020
 	// MPG341CQR returns '__0' on screen_info
 	new setting_t(PS341WU | MAG274GRP | MAG251RX | MPG273CQR | MAG321QR | MAG274QRX | MD272QP,
 		                                   "00830", "screen_info", {"off", "on"}),
@@ -816,13 +826,13 @@ static std::vector<setting_t *> settings(
 	new setting_t(MAG274GRP | MAG251RX,    "00920", "navi_left",  {"off", "brightness", "game_mode", "screen_assistance", "alarm_clock", "input", "refresh_rate", "info"}),
 	new setting_t(MAG274GRP | MAG251RX,    "00930", "navi_right", {"off", "brightness", "game_mode", "screen_assistance", "alarm_clock", "input", "refresh_rate", "info"}),
 
-	new setting_t(MAG321CURV | MAG321CQR | MAG271CQR | MPG27CQ, 
+	new setting_t(MAG321CURV | MAG321CQR | MAG271CQR | MPG27CQ,
 	                                       "00900", "navi_up", {"off", "brightness", "game_mode", "screen_assistance", "alarm_clock", "input", "pip", "refresh_rate"}),
-	new setting_t(MAG321CURV | MAG321CQR | MAG271CQR | MPG27CQ, 
+	new setting_t(MAG321CURV | MAG321CQR | MAG271CQR | MPG27CQ,
 	                                       "00910", "navi_down", {"off", "brightness", "game_mode", "screen_assistance", "alarm_clock", "input", "pip", "refresh_rate"}),
-	new setting_t(MAG321CURV | MAG321CQR | MAG271CQR | MPG27CQ, 
+	new setting_t(MAG321CURV | MAG321CQR | MAG271CQR | MPG27CQ,
 	                                       "00920", "navi_left", {"off", "brightness", "game_mode", "screen_assistance", "alarm_clock", "input", "pip", "refresh_rate"}),
-	new setting_t(MAG321CURV | MAG321CQR | MAG271CQR | MPG27CQ, 
+	new setting_t(MAG321CURV | MAG321CQR | MAG271CQR | MPG27CQ,
 	                                       "00930", "navi_right", {"off", "brightness", "game_mode", "screen_assistance", "alarm_clock", "input", "pip", "refresh_rate"}),
 
 	new setting_t(PS341WU,                 "00900", "navi_up",   {"off", "brightness", "pro_mode", "screen_assistance", "alarm_clock", "input", "pip", "zoom_in", "info"}),
@@ -895,7 +905,7 @@ struct led_data_generic
 		unsigned v = 0;
 		if (m > MAX_LEDS)
 			m = MAX_LEDS;
-			
+
 		while (i < m)
 		{
 			v = colors[i];
@@ -968,7 +978,7 @@ static int str_to_mode(std::string opt, uint8_t &mode)
 		{ mode = 0x1a; return 0; }
 	else if (opt == "random")
 		{ mode = 0x1f; return 0; }
-	
+
 	return error(E_SYNTAX, "Error decoding mystic mode: %s", opt);;
 }
 
@@ -990,7 +1000,7 @@ static int mystic_opt(std::string opt, std::size_t supported_group_mask, led_dat
 		return error(E_SYNTAX, "Error mystic group not supported: %d", group);
 
 	leds.set_mode(group, mode);
-	
+
 	if (p.size() == 3)
 	{
 		std::vector<unsigned> colors;
@@ -1673,14 +1683,14 @@ int main (int argc, char **argv)
 		int idx = 1;
 		for (auto &e : monitor_list)
 		{
-			mondev_t mon(logger, e, "MSI Gaming Controller", "");
+			mondev_t mon(logger, e, "", "");
 			pprintf("%d,%s,%s,%s,%s\n", idx, mon.serial(), mon.manufacturer(), mon.product(), e.path);
 			idx ++;
 		}
 		//return E_OK;
 	}
 
-	mondev_t usb(logger, monitor_list[monitor ? monitor - 1 : 0], "MSI Gaming Controller", serial);
+	mondev_t usb(logger, monitor_list[monitor ? monitor - 1 : 0], "", serial);
 
 	if (usb)
 	{
@@ -1688,7 +1698,7 @@ int main (int argc, char **argv)
 		// Try to identify the monitor
 		std::string s140;
 		std::string s150;
-		identity_t &series = known_models[0];
+		identity_t series = known_models[0];
 
 		setting_t sp140(ALL, "00140", "sp140");
 		setting_t sp150(ALL, "00150", "sp150");
@@ -1741,13 +1751,17 @@ int main (int argc, char **argv)
 			pprintf("LED support:    %s\n",     leds);
 			if (debug)
 			{
-				pprintf("s140:           <%s>\n", s140);
-				pprintf("s150:           <%s>\n", s150);
-				usb.debug_cmd("\x01\xb0");
-				usb.debug_cmd("\x01\xb4");
-				// set after MSI app 20191206 0.0.2.23
-				if ((series.series & MAG241GRP) == 0) // times out on MAG241GRP
-					usb.debug_cmd("\x01\xd0""b00100000\r");
+				pprintf("s140:           <%s>\n", hexify_if_not_printable(s140));
+				pprintf("s150:           <%s>\n", hexify_if_not_printable(s150));
+				// Avoid undocumented diagnostic transactions on the new profile.
+				if (series.series != MPG322URX)
+				{
+					usb.debug_cmd("\x01\xb0");
+					usb.debug_cmd("\x01\xb4");
+					// set after MSI app 20191206 0.0.2.23
+					if ((series.series & MAG241GRP) == 0) // times out on MAG241GRP
+						usb.debug_cmd("\x01\xd0""b00100000\r");
+				}
 
 				// queried but not supported on MAG321CURV (returns 56006)
 				//usb.debug_cmd("\x01""5800190\r");
@@ -1782,8 +1796,12 @@ int main (int argc, char **argv)
 		if ((series.series == QUERYONLY) && set_encoded.size() > 0)
 			return error(E_SYNTAX, "Unknown monitor - write access disabled");
 
-		if (series.ro && set_encoded.size() > 0)
-			return error(E_SYNTAX, "Tests missing - write access disabled");
+		// Validate every setting before sending any writes. The MPG322URX
+		// exception is limited to Adaptive Sync; other settings stay read-only.
+		if (series.ro)
+			for (const auto &s : set_encoded)
+				if (series.series != MPG322URX || s.first->m_opt != "free_sync")
+					return error(E_SYNTAX, "Tests missing - write access disabled for --%s", s.first->m_opt);
 
 		// Check filters
 		if (query)
@@ -1796,7 +1814,10 @@ int main (int argc, char **argv)
 					&& (setting->m_series & series.series))
 				{
 					if (filters.empty())
-						qsettings.push_back(setting);
+					{
+						if (setting->m_opt != "adaptive_sync_probe")
+							qsettings.push_back(setting);
+					}
 					else
 					{
 						for (auto &f : filters)
